@@ -1,0 +1,566 @@
+#include <ezLCDLib.h>
+
+ezLCD3 lcd; // create lcd object
+
+#define GRAD2RAD (float)0.017453293
+
+
+long encodernr;
+long encodertime;
+long setgrader;
+long antgrader;
+long antgrader_temp;
+
+long setgraderold;
+long antgraderold;
+
+long delaymillis;
+
+long switchtime;
+
+long rotor_safetime;
+
+byte rotor;
+byte rotorold;
+
+#define CW 1
+#define CCW 2
+#define BREAK 3
+#define DELAY_RUN 4
+#define DELAY_BREAK 5
+#define WAIT_DELAY_RUN 6
+#define WAIT_DELAY_BREAK 7
+
+
+// I/O pins
+#define DEKODER_1 		2
+#define DEKODER_2 		3
+
+#define DEKODER_SW 		A1
+
+#define ROTOR_POT 		A2
+
+#define RELE_BREAK  	4
+#define RELE_CCW    	5
+#define RELE_CW 		6 
+
+
+
+#define ROTOR_POT_MIN 	25
+#define ROTOT_POT_MAX	855
+
+#define BREAK_DELAY_START		500
+#define BREAK_DELAY_STOP		500
+
+#define ROTOT_SAFETIME			85000
+
+
+
+
+class cirkel_c
+{
+//private void dotupdate();
+	
+	
+public:
+
+	void init(int cx,int cy,int cr,int ct,int cp,int coc,int co1,int co2){
+		int x;
+		int y;
+		float xf;
+		float yf;
+
+		cirkel_x = cx;
+		cirkel_y = cy;
+		cirkel_r = cr;
+		cirkel_t = ct;
+		cirkel_p = cp;
+		color_c = coc;
+		color_1 = co1;
+		color_2 = co2;
+
+        lcd.color(color_c);  
+		for (int grader = 0; grader < 360; grader=grader+2) {
+			xf = sin((float)grader * GRAD2RAD) * cirkel_r;	
+			yf = cos((float)grader * GRAD2RAD) * cirkel_r;	
+			x = (int)xf +  cirkel_x;	
+			y = -(int)yf + 240 - cirkel_y;	
+	        lcd.circle( x, y, cirkel_t, FILL );  
+		}
+		xo1 = -500;
+		yo1 = -500;
+		xo2 = -500;
+		yo2 = -500;
+		
+		grader1 = 0;
+		grader2 = 0;
+		
+	}
+
+
+
+	void setdot1(int grader) {
+		grader1 = grader;
+		dotupdate();
+	}
+
+	void setdot2(int grader) {
+		grader2 = grader;
+		dotupdate();
+	}
+
+
+private:	
+	int xo1,xo2;
+	int yo1,yo2;
+	
+	int cirkel_x;
+	int cirkel_y;
+	int cirkel_t;
+	int cirkel_r;
+	int cirkel_p;
+	
+	int color_c;
+	int color_1;
+	int color_2;
+	
+	int grader1,grader2;
+
+	void dotupdate() {
+
+		int x;
+		int y;
+		float xf;
+		float yf;
+
+		xf = sin((float)grader1 * GRAD2RAD) * cirkel_r;	
+		yf = cos((float)grader1 * GRAD2RAD) * cirkel_r;	
+		x = (int)xf +  cirkel_x;	
+		y = -(int)yf + 240 - cirkel_y;	
+		if ((xo1 != x) || (yo1 != y)) {
+	        lcd.color(color_c);  
+	        lcd.circle( xo1, yo1, cirkel_p, FILL );  
+	    }
+	
+        lcd.color(color_1);  
+        lcd.circle( x, y, cirkel_p, FILL );  
+        xo1 = x;
+        yo1 = y;
+
+
+		xf = sin((float)grader2 * GRAD2RAD) * cirkel_r;	
+		yf = cos((float)grader2 * GRAD2RAD) * cirkel_r;	
+		x = (int)xf +  cirkel_x;	
+		y = -(int)yf + 240 - cirkel_y;	
+		if ((xo2 != x) || (yo2 != y)) {
+        	lcd.color(color_c);  
+	        lcd.circle( xo2, yo2, cirkel_p, FILL );  
+		}
+        lcd.color(color_2);  
+        lcd.circle( x, y, cirkel_p, FILL );  
+        xo2 = x;
+        yo2 = y;
+	}
+
+
+	
+};
+
+
+cirkel_c cirkel;
+
+
+void setup()
+{
+	
+	// LCD	
+	lcd.begin( EZM_BAUD_RATE );
+
+	lcd.cls(); 
+	lcd.light(70); 
+	lcd.picture(0,0,"QSL-1.gif"); 
+
+    lcd.font(0);       
+	lcd.color(BLACK);
+  	lcd.xy(20,205);
+	lcd.print("d. 9/11-2014");
+
+
+	delay(2000);
+
+	lcd.cls(); 
+	lcd.light(70); 
+	lcd.picture(0,0,"Map2.gif"); 
+
+	cirkel.init(99,122,90,8,7,BLACK,RED,GREEN);
+	
+    lcd.color(BLUE);  
+	lcd.rect(242,0,78,240,FILL);
+
+
+    lcd.font(0);       
+	
+	
+	// encoder
+    pinMode(DEKODER_1, INPUT_PULLUP);
+    pinMode(DEKODER_2, INPUT_PULLUP);
+    attachInterrupt(0, encoder, CHANGE);
+    encodernr = 0;
+
+	encodertime	= 0;
+
+    pinMode(DEKODER_SW, INPUT_PULLUP);
+
+    rotor = BREAK;
+    delaymillis = 0;
+    
+    switchtime = 0;
+	rotorold = BREAK;
+
+ 	antgrader = 45;
+
+	setgraderold = -1000;
+	antgraderold = -1000;
+
+
+	// ROTOR POTMETER
+
+
+	// RELE
+    pinMode(RELE_BREAK, OUTPUT);
+    pinMode(RELE_CCW, OUTPUT);
+    pinMode(RELE_CW, OUTPUT);
+
+	digitalWrite(RELE_BREAK ,LOW);
+	digitalWrite(RELE_CCW   ,LOW);
+	digitalWrite(RELE_CW 	,LOW);
+		
+
+	// LCD
+    lcd.font(0);       
+	lcd.color(WHITE);
+  	lcd.xy(250,70);
+	lcd.println("Set");
+  	lcd.xy(250,20);
+	lcd.println("Antenne");
+
+  	lcd.xy(270,120);
+	lcd.println("CW");
+  	lcd.xy(270,150);
+	lcd.println("CCW");
+  	lcd.xy(270,180);
+	lcd.println("BRK");
+
+    lcd.font(0);       
+	lcd.color(BLACK);
+  	lcd.xy(246,215);
+	lcd.print("OZ4ACH");
+ 
+
+
+
+  	lcd.drawLed( 10, 255, 130, BLACK, WHITE);
+  	lcd.drawLed( 10, 255, 160, BLACK, WHITE);
+  	lcd.drawLed( 10, 255, 190, BLACK, WHITE);
+}
+
+
+void loop(){
+
+    if (encodernr > 180)
+    {
+        encodernr = -180;//180;
+    }
+    if (encodernr < -180)
+    {
+        encodernr = 180;//-180;
+    }
+
+	setgrader = encodernr;
+
+	// read antenne position
+ 	antgrader = analogRead(ROTOR_POT);
+
+
+	if (antgrader < ROTOR_POT_MIN) {
+		antgrader = ROTOR_POT_MIN;
+	}
+	if (antgrader > ROTOT_POT_MAX) {
+		antgrader = ROTOT_POT_MAX;
+	}
+
+ 	antgrader = 1024 - antgrader;   // invert read
+ 	antgrader = 102300 / antgrader; // 1023 * 100R
+ 	antgrader = antgrader - 100;    // 100R
+ 	antgrader = antgrader * 360;    // 360 grader
+ 	antgrader = antgrader / 495;    // 500R max potmeter
+ 	antgrader = antgrader - 180; 
+
+ 	//if (rotor == CW) antgrader++;
+ 	//if (rotor == CCW) antgrader--;
+ 	
+  
+
+    if (digitalRead(DEKODER_SW) == 0)
+    {
+        switchtime++;
+    } else 
+    {
+        switchtime = 0;
+    }
+
+
+
+	if (lcd.touchS() == 1) {
+		int tx = lcd.touchX();
+		int ty = lcd.touchY();
+		
+		if ((  0 < tx) && (tx <  66) && (  0 < ty) && (ty <  89))  {setgrader = -45; switchtime = 2;}
+		if ((  0 < tx) && (tx <  66) && ( 89 < ty) && (ty <  155)) {setgrader = -90; switchtime = 2;}
+		if ((  0 < tx) && (tx <  66) && (155 < ty) && (ty <  240)) {setgrader =-135; switchtime = 2;}
+
+		if (( 66 < tx) && (tx < 134) && (  0 < ty) && (ty <  89))  {setgrader =   0; switchtime = 2;}
+		if (( 66 < tx) && (tx < 134) && ( 89 < ty) && (ty <  155)) {                 switchtime = 2;}
+		if (( 66 < tx) && (tx < 134) && (155 < ty) && (ty <  240)) {setgrader = 180; switchtime = 2;}
+			 
+		if ((134 < tx) && (tx < 200) && (  0 < ty) && (ty <  89))  {setgrader =  45; switchtime = 2;}
+		if ((134 < tx) && (tx < 200) && ( 89 < ty) && (ty <  155)) {setgrader =  90; switchtime = 2;}
+		if ((134 < tx) && (tx < 200) && (155 < ty) && (ty <  240)) {setgrader = 135; switchtime = 2;}
+
+	 	encodernr = setgrader;
+
+		while (lcd.touchS() == 1) {};
+		delay(10);
+	}
+
+
+
+	switch (rotor) {
+		case (CW):
+		    if (switchtime == 2)
+		    {
+		        rotor = DELAY_BREAK;
+		    }
+			if (setgrader <= antgrader)
+			{
+				rotor = DELAY_BREAK;
+			}
+			if (rotor_safetime < millis()) {
+				rotor = DELAY_BREAK;
+				lcd.color(BLACK);
+			  	lcd.xy(160,215);
+				lcd.print("SAFETIME");
+			}
+			break;
+		case (CCW):
+		    if (switchtime == 2)
+		    {
+		        rotor = DELAY_BREAK;
+		    }
+			if (setgrader >= antgrader)
+			{
+				rotor = DELAY_BREAK;
+			}
+			if (rotor_safetime < millis()) {
+				rotor = DELAY_BREAK;
+				lcd.color(BLACK);
+			  	lcd.xy(160,215);
+				lcd.print("SAFETIME");
+			}
+			break;
+		case (BREAK):
+		    if (switchtime == 2)
+		    {
+		        rotor = DELAY_RUN;
+
+				rotor_safetime = ROTOT_SAFETIME ; 
+				rotor_safetime = rotor_safetime * abs(setgrader - antgrader);
+				rotor_safetime = rotor_safetime /360;
+				rotor_safetime = rotor_safetime + millis() + BREAK_DELAY_START + 500;
+		    }
+			break;
+		case (DELAY_RUN):
+			// set break on output
+			delaymillis = millis() + BREAK_DELAY_START;
+			rotor = WAIT_DELAY_RUN;
+			break;
+		case (WAIT_DELAY_RUN):
+			if (delaymillis < millis()) {
+				if (setgrader > antgrader)
+				{
+					rotor = CW;
+				}
+				else
+				{
+					rotor = CCW;
+				}
+			}
+			break;
+		case (DELAY_BREAK):
+			delaymillis = millis() + BREAK_DELAY_STOP;
+			rotor = WAIT_DELAY_BREAK;
+			break;
+		case (WAIT_DELAY_BREAK):
+			if (delaymillis < millis()) {
+				// set break off output
+				rotor = BREAK;
+			}
+			break;
+		default:
+			rotor = DELAY_BREAK;
+	}
+
+
+
+
+
+	if (rotor != rotorold) {
+		switch (rotor) {
+			case (CW):
+			  	lcd.drawLed( 10, 255, 130, GREEN, WHITE);
+			  	lcd.drawLed( 10, 255, 160, BLACK, WHITE);
+			  	lcd.drawLed( 10, 255, 190, RED, WHITE);
+				digitalWrite(RELE_BREAK ,HIGH);
+				digitalWrite(RELE_CCW   ,LOW);
+				digitalWrite(RELE_CW 	,HIGH);
+				break;
+			case (CCW):
+			  	lcd.drawLed( 10, 255, 130, BLACK, WHITE);
+			  	lcd.drawLed( 10, 255, 160, GREEN, WHITE);
+			  	lcd.drawLed( 10, 255, 190, RED, WHITE);
+				digitalWrite(RELE_BREAK ,HIGH);
+				digitalWrite(RELE_CCW   ,HIGH);
+				digitalWrite(RELE_CW 	,LOW);
+				break;
+			case (BREAK):
+			  	lcd.drawLed( 10, 255, 130, BLACK, WHITE);
+			  	lcd.drawLed( 10, 255, 160, BLACK, WHITE);
+			  	lcd.drawLed( 10, 255, 190, BLACK, WHITE);
+				digitalWrite(RELE_BREAK ,LOW);
+				digitalWrite(RELE_CCW   ,LOW);
+				digitalWrite(RELE_CW 	,LOW);
+				break;
+			case (DELAY_RUN):
+			  	lcd.drawLed( 10, 255, 130, BLACK, WHITE);
+			  	lcd.drawLed( 10, 255, 160, BLACK, WHITE);
+			  	lcd.drawLed( 10, 255, 190, RED, WHITE);
+				digitalWrite(RELE_BREAK ,HIGH);
+				digitalWrite(RELE_CCW   ,LOW);
+				digitalWrite(RELE_CW 	,LOW);
+				break;
+			case (WAIT_DELAY_RUN):
+			  	lcd.drawLed( 10, 255, 130, BLACK, WHITE);
+			  	lcd.drawLed( 10, 255, 160, BLACK, WHITE);
+			  	lcd.drawLed( 10, 255, 190, RED, WHITE);
+				digitalWrite(RELE_BREAK ,HIGH);
+				digitalWrite(RELE_CCW   ,LOW);
+				digitalWrite(RELE_CW 	,LOW);
+				break;
+			case (DELAY_BREAK):
+			  	lcd.drawLed( 10, 255, 130, BLACK, WHITE);
+			  	lcd.drawLed( 10, 255, 160, BLACK, WHITE);
+			  	lcd.drawLed( 10, 255, 190, RED, WHITE);
+				digitalWrite(RELE_BREAK ,HIGH);
+				digitalWrite(RELE_CCW   ,LOW);
+				digitalWrite(RELE_CW 	,LOW);
+				break;
+			case (WAIT_DELAY_BREAK):
+			  	lcd.drawLed( 10, 255, 130, BLACK, WHITE);
+			  	lcd.drawLed( 10, 255, 160, BLACK, WHITE);
+			  	lcd.drawLed( 10, 255, 190, RED, WHITE);
+				digitalWrite(RELE_BREAK ,HIGH);
+				digitalWrite(RELE_CCW   ,LOW);
+				digitalWrite(RELE_CW 	,LOW);
+				break;
+			default:
+			  	lcd.drawLed( 10, 255, 130, BLUE, WHITE);
+			  	lcd.drawLed( 10, 255, 160, BLUE, WHITE);
+			  	lcd.drawLed( 10, 255, 190, BLUE, WHITE);
+				digitalWrite(RELE_BREAK ,LOW);
+				digitalWrite(RELE_CCW   ,LOW);
+				digitalWrite(RELE_CW 	,LOW);
+		}
+	}
+	rotorold = rotor;
+
+   
+
+ 
+	if (setgraderold != setgrader) {
+		long setgraderv;
+		if (setgrader < 0) setgraderv = setgrader + 360; else setgraderv = setgrader;
+    	cirkel.setdot1(setgraderv);  
+
+		lcd.color(BLACK);  
+		lcd.rect(260,90,45,21,FILL);
+	
+	    lcd.font(0);       
+		lcd.color(WHITE);
+	  	lcd.xy(270,90);
+		lcd.print(setgraderv);
+		antgraderold = -1000;
+	}
+	setgraderold = setgrader;
+	
+    
+	if (	(	(antgraderold != antgrader) 
+			&&  (rotor != BREAK))
+		||	(antgraderold > (antgrader + 5))
+		||	(antgraderold < (antgrader - 5))
+		)
+	{
+		long antgraderv;
+		if (antgrader < 0) antgraderv = antgrader + 360; else antgraderv = antgrader;
+	    cirkel.setdot2(antgraderv);  
+	
+		lcd.color(BLACK);  
+		lcd.rect(260,40,45,22,FILL);
+	
+	    lcd.font(0);       
+		lcd.color(WHITE);
+	  	lcd.xy(270,40);
+		lcd.print(antgraderv);
+
+		antgraderold = antgrader;
+	}
+
+
+}
+
+
+
+#define ENCODER_STEP 5
+
+void encoder()
+{
+    byte e2;
+    byte e3;
+
+	if (encodertime < millis()) {
+		encodertime = millis() + 35;
+
+	    e2 = digitalRead(DEKODER_1);
+	    e3 = digitalRead(DEKODER_2);
+	
+	    if ((e2 == 0) && (e3 == 0))
+	    {
+	        encodernr = encodernr - ENCODER_STEP;
+	    } 
+	
+	    if ((e2 == 0) && (e3 == 1))
+	    {
+	        encodernr = encodernr + ENCODER_STEP;
+	    } 
+	
+	    if ((e2 == 1) && (e3 == 0))
+	    {
+	        encodernr = encodernr + ENCODER_STEP;
+	    } 
+	
+	    if ((e2 == 1) && (e3 == 1))
+	    {
+	        encodernr = encodernr - ENCODER_STEP;
+	    } 
+	}
+}
+
