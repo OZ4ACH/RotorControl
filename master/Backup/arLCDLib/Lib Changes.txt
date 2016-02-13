@@ -1,0 +1,4 @@
+1) Image.ino is obsolete.  Use picture.ino
+Delete image.ino and directory
+2) arLCDhtml.zip was added as early documentation
+3) arLCDTest_newlib was replaced by arLCDTest

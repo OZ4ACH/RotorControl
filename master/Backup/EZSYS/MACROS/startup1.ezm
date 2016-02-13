@@ -1,0 +1,54 @@
+'************** Startup.ezm ********************************
+' ArduinLCD startup.ezm 
+' (c) 2012 Earth Computer Technologies, Inc dba EarthLCD.com
+'Release 2.0 Nov 12, 2012 
+'Firmware Version 1.1 and File System Release E
+'***********************************************************
+'THIS MACRO IS AUTOMATICALLY RUN AT POWERUP AND RESET
+verbose off    'Do not display debug information to command port
+'**********************
+' Draw Startup Screen *
+'**********************
+light 100
+'******************
+'* ezLCD defaults *
+'******************
+'***********************************
+'Changing below themes will cause manual and provided examples to function
+'differently. Add your own themes instead of changing these!
+'setup  fonts for themes 0 - 7
+fontw 0 0
+fontw 1 0
+fontw 2 serif24
+fontw 3 serif24
+fontw 4 serif24
+fontw 5 serif24
+fontw 6 serif24
+fontw 7 serif24
+
+theme 0   1   2 0 0 0  3  2   1 0 0
+theme 1 155 152 3 3 3  4  9   5 0 1
+theme 2   5  20 3 3 3  4  9   5 0 2
+theme 3   9   3 0 0 0  8  37   9 0 3
+theme 4   7   3 0 0 0  6  9   6 6 4
+theme 5 126 118 3 3 3 35 101  36 0 5
+theme 6 111 106 3 3 3 12 2 101 0 1
+theme 7  58  48 3 3 3 14 97 54 0 7
+
+picture "safemode.gif"
+color white
+bridgeto 1000
+bridge USBserial2 
+'setup usb bridge to program arduino 
+CFGIO 2 serial1_tx 115200 n81
+CFGIO 6 serial1_rx 9600 n81
+cmd serial1
+'extra options 
+cfgio 9 touch_int low quiet
+cfgio 3 busy high
+CFGIO 7 USB_DTR
+pause 400
+
+
+
+
