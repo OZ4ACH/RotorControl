@@ -1,0 +1,10 @@
+verbose off    'Do not display debug information to command port
+light 100
+picture upgrade.gif
+'wait for press of touch screen
+wait !T
+'wait for release of touch screen
+wait TR
+'upgrade firmware
+upgrade ezLCD
+
